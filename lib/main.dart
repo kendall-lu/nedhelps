@@ -49,8 +49,8 @@ Future<Response> fetchData() async {
       'https://gist.githubusercontent.com/motgi/8fc373cbfccee534c820875ba20ae7b5/raw/7143758ff2caa773e651dc3576de57cc829339c0/config.json'));
 }
 
-String fromDollars(String dollars) {
-  return dollars.replaceAll(RegExp(r'[^\w\s]+'), '');
+int fromDollars(String dollars) {
+  return int.parse(dollars.replaceAll(RegExp(r'[^\w\s]+'), ''));
 }
 
 class MyComponent extends StatefulWidget {
@@ -61,17 +61,27 @@ class MyComponent extends StatefulWidget {
 }
 
 // ignore: constant_identifier_names - using JSON values to key into handleUpdate
-enum KnownKey { revenue_amount }
+enum KnownKey { revenue_amount, funding_amount }
 
 class _MyComponentState extends State<MyComponent> {
   Metadata? revenue;
   Metadata? fundingAmount;
+  Metadata? revenuePercentage;
+  Metadata? revenueSharedFrequency;
+  Metadata? desiredRepaymentDelay;
+  Metadata? useOfFunds;
 
-  Map<KnownKey, dynamic> knownKeyToValue = {KnownKey.revenue_amount: 0};
+  Map<KnownKey, int> knownKeyToValue = {
+    KnownKey.revenue_amount: 1,
+    KnownKey.funding_amount: 1,
+  };
 
-  void handleUpdate({required KnownKey key, required dynamic value}) {
+  void handleUpdate({required KnownKey key, required int value}) {
     setState(() {
       knownKeyToValue[key] = value;
+      if (key == KnownKey.revenue_amount) {
+        knownKeyToValue[KnownKey.funding_amount] = (value / 3).toInt();
+      }
     });
   }
 
@@ -92,6 +102,14 @@ class _MyComponentState extends State<MyComponent> {
                 break;
               case 'funding_amount':
                 fundingAmount = metadata;
+              case 'revenue_percentage':
+                revenuePercentage = metadata;
+              case 'revenue_shared_frequency':
+                revenueSharedFrequency = metadata;
+              case 'desired_repayment_delay':
+                desiredRepaymentDelay = metadata;
+              case 'use_of_funds':
+                useOfFunds = metadata;
             }
           });
         });
@@ -111,10 +129,14 @@ class _MyComponentState extends State<MyComponent> {
         children: [
           Expanded(
             child: FinancingOptions(
-              revenue: revenue,
-              fundingAmount: fundingAmount,
               knownKeyToValue: knownKeyToValue,
               handleUpdate: handleUpdate,
+              revenue: revenue,
+              fundingAmount: fundingAmount,
+              revenuePercentage: revenuePercentage,
+              revenueSharedFrequency: revenueSharedFrequency,
+              desiredRepaymentDelay: desiredRepaymentDelay,
+              useOfFunds: useOfFunds,
             ),
           ),
           Expanded(
@@ -128,18 +150,25 @@ class _MyComponentState extends State<MyComponent> {
 }
 
 class FinancingOptions extends StatefulWidget {
+  final Map<KnownKey, int> knownKeyToValue;
+  final void Function({required KnownKey key, required int value}) handleUpdate;
   final Metadata? revenue;
   final Metadata? fundingAmount;
-  final Map<KnownKey, dynamic> knownKeyToValue;
-  final void Function({required KnownKey key, required dynamic value})
-      handleUpdate;
+  final Metadata? revenuePercentage;
+  final Metadata? revenueSharedFrequency;
+  final Metadata? desiredRepaymentDelay;
+  final Metadata? useOfFunds;
 
   const FinancingOptions({
     super.key,
-    required this.revenue,
-    required this.fundingAmount,
     required this.knownKeyToValue,
     required this.handleUpdate,
+    required this.revenue,
+    required this.fundingAmount,
+    required this.revenuePercentage,
+    required this.revenueSharedFrequency,
+    required this.desiredRepaymentDelay,
+    required this.useOfFunds,
   });
 
   @override
@@ -149,6 +178,7 @@ class FinancingOptions extends StatefulWidget {
 class _FinancingOptionsState extends State<FinancingOptions> {
   TextEditingController? financingOptionsController;
   double? initialValue;
+  String? sharedFrequency;
 
   @override
   void initState() {
@@ -162,6 +192,8 @@ class _FinancingOptionsState extends State<FinancingOptions> {
   @override
   Widget build(BuildContext context) {
     var revenueAmount = widget.knownKeyToValue[KnownKey.revenue_amount];
+    var fundingAmount = widget.knownKeyToValue[KnownKey.funding_amount];
+
     return Card(
         margin: EdgeInsets.zero,
         child: SizedBox.expand(
@@ -178,20 +210,71 @@ class _FinancingOptionsState extends State<FinancingOptions> {
               autovalidateMode: AutovalidateMode.always,
               keyboardType: TextInputType.number,
               controller: financingOptionsController,
-              initialValue: revenueAmount,
+              initialValue: '$revenueAmount',
               onChanged: (val) {
                 var parsedVal = int.tryParse(val);
                 if (parsedVal != null && parsedVal > 0) {
                   widget.handleUpdate(
-                      key: KnownKey.revenue_amount,
-                      value: parsedVal.toString());
+                      key: KnownKey.revenue_amount, value: parsedVal);
                 }
               },
             ),
             RevenueAmount(
-                fundingAmount: widget.fundingAmount,
+              key: Key(initialValue.toString()),
+              fundingAmount: widget.fundingAmount,
+              knownKeyToValue: widget.knownKeyToValue,
+              handleUpdate: widget.handleUpdate,
+            ),
+            Row(
+              children: [
+                Text('${widget.revenuePercentage?.tooltip ?? ''}: '),
+                Text(
+                    '${(((0.156 / 6.2055 / (revenueAmount ?? 1)) * ((fundingAmount ?? 1) * 10)) * 100).toStringAsFixed(2)}%'),
+              ],
+            ),
+            if (widget.revenueSharedFrequency != null)
+              Row(
+                children: [
+                  Text(widget.revenueSharedFrequency!.label),
+                  Row(
+                    children: [
+                      ...widget.revenueSharedFrequency!.value
+                          .split('*')
+                          .map((e) {
+                        return Row(
+                          children: [
+                            Radio(
+                                value: e,
+                                groupValue: sharedFrequency,
+                                onChanged: (val) {
+                                  setState(() {
+                                    sharedFrequency = val;
+                                  });
+                                }),
+                            Text(e),
+                          ],
+                        );
+                      })
+                    ],
+                  ),
+                ],
+              ),
+            if (widget.desiredRepaymentDelay != null)
+              Row(
+                children: [
+                  Text(widget.desiredRepaymentDelay!.label),
+                  DropdownMenu(
+                      dropdownMenuEntries: widget.desiredRepaymentDelay!.value
+                          .split('*')
+                          .map((val) {
+                    return DropdownMenuEntry(value: val, label: val);
+                  }).toList())
+                ],
+              ),
+            UseOfFunds(
+                useOfFunds: widget.useOfFunds,
                 knownKeyToValue: widget.knownKeyToValue,
-                key: Key(initialValue.toString()))
+                handleUpdate: widget.handleUpdate)
           ],
         )));
   }
@@ -199,11 +282,14 @@ class _FinancingOptionsState extends State<FinancingOptions> {
 
 class RevenueAmount extends StatefulWidget {
   final Metadata? fundingAmount;
-  final Map<KnownKey, dynamic> knownKeyToValue;
+  final Map<KnownKey, int> knownKeyToValue;
+  final void Function({required KnownKey key, required int value}) handleUpdate;
+
   const RevenueAmount({
     super.key,
     required this.fundingAmount,
     required this.knownKeyToValue,
+    required this.handleUpdate,
   });
 
   @override
@@ -219,10 +305,9 @@ class _RevenueAmountState extends State<RevenueAmount> {
 
   @override
   Widget build(BuildContext context) {
-    int revenueAmount =
-        int.parse(widget.knownKeyToValue[KnownKey.revenue_amount]);
-
-    double maxRevenue = (revenueAmount / 3);
+    var revenueAmount = widget.knownKeyToValue[KnownKey.revenue_amount]!;
+    var fundingAmount = widget.knownKeyToValue[KnownKey.funding_amount]!;
+    double maxRevenue = revenueAmount / 3;
     return Row(children: [
       Expanded(
           child: Column(
@@ -231,16 +316,15 @@ class _RevenueAmountState extends State<RevenueAmount> {
           Text(widget.fundingAmount?.label ?? ''),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [Text('0'), Text('$maxRevenue')],
+            children: [Text('0'), Text(maxRevenue.toStringAsFixed(0))],
           ),
           Slider(
             min: 0,
             value: fundingAmount.toDouble(),
             max: maxRevenue,
             onChanged: (val) {
-              setState(() {
-                fundingAmount = val;
-              });
+              widget.handleUpdate(
+                  key: KnownKey.funding_amount, value: val.toInt());
             },
           ),
         ],
@@ -256,12 +340,34 @@ class _RevenueAmountState extends State<RevenueAmount> {
               // TODO: Fix bug..
               var parsedVal = int.tryParse(val);
               if (parsedVal != null && parsedVal <= maxRevenue) {
-                setState(() {
-                  fundingAmount = parsedVal.toDouble();
-                });
+                widget.handleUpdate(
+                    key: KnownKey.funding_amount, value: parsedVal);
               }
             },
-          ))
+          )),
     ]);
+  }
+}
+
+class UseOfFunds extends StatefulWidget {
+  final Metadata? useOfFunds;
+  final Map<KnownKey, int> knownKeyToValue;
+  final void Function({required KnownKey key, required int value}) handleUpdate;
+
+  const UseOfFunds({
+    super.key,
+    required this.useOfFunds,
+    required this.knownKeyToValue,
+    required this.handleUpdate,
+  });
+
+  @override
+  State<UseOfFunds> createState() => _UseOfFundsState();
+}
+
+class _UseOfFundsState extends State<UseOfFunds> {
+  @override
+  Widget build(BuildContext context) {
+    return const Placeholder();
   }
 }
