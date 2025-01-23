@@ -1,8 +1,12 @@
+// ignore_for_file: constant_identifier_names
+
 import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
+import 'package:nedhelps/widgets/financing_options.dart';
+import 'package:nedhelps/widgets/results.dart';
 import 'classes/metadata.dart';
 
 void main() {
@@ -20,26 +24,9 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
+      home: const Scaffold(
+        body: MyComponent(),
       ),
-      body: MyComponent(),
     );
   }
 }
@@ -49,8 +36,24 @@ Future<Response> fetchData() async {
       'https://gist.githubusercontent.com/motgi/8fc373cbfccee534c820875ba20ae7b5/raw/7143758ff2caa773e651dc3576de57cc829339c0/config.json'));
 }
 
-int fromDollars(String dollars) {
-  return int.parse(dollars.replaceAll(RegExp(r'[^\w\s]+'), ''));
+int filterNumbers(String input) {
+  return int.parse(input.replaceAll(RegExp(r'[^0-9]'), ''));
+}
+
+double fromDollars(String dollars) {
+  return int.parse(dollars.replaceAll(RegExp(r'[^\w\s]+'), '')).toDouble();
+}
+
+String percentageFrom(double? value) {
+  return value != null && !value.isNaN
+      ? '${(value * 100).toStringAsFixed(2)}%'
+      : '0%';
+}
+
+String toDollar(double? value) {
+  return value != null && !value.isNaN
+      ? '\$${value.toStringAsFixed(2)}'
+      : '\$0.00';
 }
 
 class MyComponent extends StatefulWidget {
@@ -60,8 +63,19 @@ class MyComponent extends StatefulWidget {
   State<MyComponent> createState() => _MyComponentState();
 }
 
-// ignore: constant_identifier_names - using JSON values to key into handleUpdate
-enum KnownKey { revenue_amount, funding_amount }
+enum KnownKey {
+  revenue_amount,
+  loan_amount,
+  revenue_percentage,
+  revenue_share_frequency,
+  desired_repayment_delay,
+  max_loan_amount,
+}
+
+enum RevenueShareFrequency {
+  weekly,
+  monthly,
+}
 
 class _MyComponentState extends State<MyComponent> {
   Metadata? revenue;
@@ -71,50 +85,72 @@ class _MyComponentState extends State<MyComponent> {
   Metadata? desiredRepaymentDelay;
   Metadata? useOfFunds;
 
-  Map<KnownKey, int> knownKeyToValue = {
-    KnownKey.revenue_amount: 1,
-    KnownKey.funding_amount: 1,
-  };
+  Map<KnownKey, dynamic> knownKeyToValue = {};
 
-  void handleUpdate({required KnownKey key, required int value}) {
+  void handleUpdate({required KnownKey key, required dynamic value}) {
     setState(() {
+      knownKeyToValue = {...knownKeyToValue};
       knownKeyToValue[key] = value;
-      if (key == KnownKey.revenue_amount) {
-        knownKeyToValue[KnownKey.funding_amount] = (value / 3).toInt();
+
+      if (key == KnownKey.revenue_amount || key == KnownKey.loan_amount) {
+        if (key == KnownKey.revenue_amount) {
+          knownKeyToValue[KnownKey.revenue_amount] = value;
+          knownKeyToValue[KnownKey.max_loan_amount] = value / 3;
+          knownKeyToValue[KnownKey.loan_amount] = 0;
+        }
+
+        var revenueAmount = knownKeyToValue[KnownKey.revenue_amount] ?? 0;
+        var loanAmount = knownKeyToValue[KnownKey.loan_amount] ?? 0;
+
+        knownKeyToValue[KnownKey.revenue_percentage] =
+            ((0.156 / 6.2055 / revenueAmount) * (loanAmount * 10));
+      } else if (key == KnownKey.desired_repayment_delay) {
+        knownKeyToValue[KnownKey.desired_repayment_delay] =
+            filterNumbers(value);
       }
     });
   }
 
-  @override
-  void initState() {
+  void init() {
     fetchData().then((res) {
       if (res.statusCode == 200) {
         List decodedJson = jsonDecode(res.body);
-        decodedJson.forEach((json) {
+        for (var json in decodedJson) {
           var metadata = Metadata.fromJson(json);
           setState(() {
             switch (metadata.name) {
               case 'revenue_amount':
                 revenue = metadata;
                 handleUpdate(
-                    key: KnownKey.revenue_amount,
-                    value: fromDollars(metadata.placeholder));
+                  key: KnownKey.revenue_amount,
+                  value: fromDollars(metadata.placeholder),
+                );
                 break;
               case 'funding_amount':
                 fundingAmount = metadata;
+                break;
               case 'revenue_percentage':
                 revenuePercentage = metadata;
+                break;
               case 'revenue_shared_frequency':
                 revenueSharedFrequency = metadata;
+                break;
               case 'desired_repayment_delay':
                 desiredRepaymentDelay = metadata;
+                break;
               case 'use_of_funds':
                 useOfFunds = metadata;
+                break;
             }
           });
-        });
+        }
       }
     });
+  }
+
+  @override
+  void initState() {
+    init();
     super.initState();
   }
 
@@ -127,330 +163,21 @@ class _MyComponentState extends State<MyComponent> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: FinancingOptions(
-              knownKeyToValue: knownKeyToValue,
-              handleUpdate: handleUpdate,
-              revenue: revenue,
-              fundingAmount: fundingAmount,
-              revenuePercentage: revenuePercentage,
-              revenueSharedFrequency: revenueSharedFrequency,
-              desiredRepaymentDelay: desiredRepaymentDelay,
-              useOfFunds: useOfFunds,
-            ),
+          FinancingOptions(
+            knownKeyToValue: knownKeyToValue,
+            handleUpdate: handleUpdate,
+            revenue: revenue,
+            fundingAmount: fundingAmount,
+            revenuePercentage: revenuePercentage,
+            revenueSharedFrequency: revenueSharedFrequency,
+            desiredRepaymentDelay: desiredRepaymentDelay,
+            useOfFunds: useOfFunds,
           ),
-          Expanded(
-            child: Placeholder(),
+          Results(
+            knownKeyToValue: knownKeyToValue,
           ),
-          SizedBox.shrink()
         ],
       ),
-    );
-  }
-}
-
-class FinancingOptions extends StatefulWidget {
-  final Map<KnownKey, int> knownKeyToValue;
-  final void Function({required KnownKey key, required int value}) handleUpdate;
-  final Metadata? revenue;
-  final Metadata? fundingAmount;
-  final Metadata? revenuePercentage;
-  final Metadata? revenueSharedFrequency;
-  final Metadata? desiredRepaymentDelay;
-  final Metadata? useOfFunds;
-
-  const FinancingOptions({
-    super.key,
-    required this.knownKeyToValue,
-    required this.handleUpdate,
-    required this.revenue,
-    required this.fundingAmount,
-    required this.revenuePercentage,
-    required this.revenueSharedFrequency,
-    required this.desiredRepaymentDelay,
-    required this.useOfFunds,
-  });
-
-  @override
-  State<FinancingOptions> createState() => _FinancingOptionsState();
-}
-
-class _FinancingOptionsState extends State<FinancingOptions> {
-  TextEditingController? financingOptionsController;
-  double? initialValue;
-  String? sharedFrequency;
-
-  @override
-  void initState() {
-    var revenue = widget.revenue;
-    if (revenue != null) {
-      financingOptionsController = TextEditingController();
-    }
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    var revenueAmount = widget.knownKeyToValue[KnownKey.revenue_amount];
-    var fundingAmount = widget.knownKeyToValue[KnownKey.funding_amount];
-
-    return Card(
-        margin: EdgeInsets.zero,
-        child: SizedBox.expand(
-            child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Financing options',
-              style: TextStyle(fontSize: 30),
-            ),
-            Text(widget.revenue?.label ?? ''),
-            TextFormField(
-              key: Key(revenueAmount.toString()),
-              autovalidateMode: AutovalidateMode.always,
-              keyboardType: TextInputType.number,
-              controller: financingOptionsController,
-              initialValue: '$revenueAmount',
-              onChanged: (val) {
-                var parsedVal = int.tryParse(val);
-                if (parsedVal != null && parsedVal > 0) {
-                  widget.handleUpdate(
-                      key: KnownKey.revenue_amount, value: parsedVal);
-                }
-              },
-            ),
-            RevenueAmount(
-              key: Key(initialValue.toString()),
-              fundingAmount: widget.fundingAmount,
-              knownKeyToValue: widget.knownKeyToValue,
-              handleUpdate: widget.handleUpdate,
-            ),
-            Row(
-              children: [
-                Text('${widget.revenuePercentage?.tooltip ?? ''}: '),
-                Text(
-                    '${(((0.156 / 6.2055 / (revenueAmount ?? 1)) * ((fundingAmount ?? 1) * 10)) * 100).toStringAsFixed(2)}%'),
-              ],
-            ),
-            if (widget.revenueSharedFrequency != null)
-              Row(
-                children: [
-                  Text(widget.revenueSharedFrequency!.label),
-                  Row(
-                    children: [
-                      ...widget.revenueSharedFrequency!.value
-                          .split('*')
-                          .map((e) {
-                        return Row(
-                          children: [
-                            Radio(
-                                value: e,
-                                groupValue: sharedFrequency,
-                                onChanged: (val) {
-                                  setState(() {
-                                    sharedFrequency = val;
-                                  });
-                                }),
-                            Text(e),
-                          ],
-                        );
-                      })
-                    ],
-                  ),
-                ],
-              ),
-            if (widget.desiredRepaymentDelay != null)
-              Row(
-                children: [
-                  Text(widget.desiredRepaymentDelay!.label),
-                  DropdownMenu(
-                      dropdownMenuEntries: widget.desiredRepaymentDelay!.value
-                          .split('*')
-                          .map((val) {
-                    return DropdownMenuEntry(value: val, label: val);
-                  }).toList())
-                ],
-              ),
-            UseOfFunds(
-                useOfFunds: widget.useOfFunds,
-                knownKeyToValue: widget.knownKeyToValue,
-                handleUpdate: widget.handleUpdate)
-          ],
-        )));
-  }
-}
-
-class RevenueAmount extends StatefulWidget {
-  final Metadata? fundingAmount;
-  final Map<KnownKey, int> knownKeyToValue;
-  final void Function({required KnownKey key, required int value}) handleUpdate;
-
-  const RevenueAmount({
-    super.key,
-    required this.fundingAmount,
-    required this.knownKeyToValue,
-    required this.handleUpdate,
-  });
-
-  @override
-  State<RevenueAmount> createState() => _RevenueAmountState();
-}
-
-class _RevenueAmountState extends State<RevenueAmount> {
-  double fundingAmount = 0;
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    var revenueAmount = widget.knownKeyToValue[KnownKey.revenue_amount]!;
-    var fundingAmount = widget.knownKeyToValue[KnownKey.funding_amount]!;
-    double maxRevenue = revenueAmount / 3;
-    return Row(children: [
-      Expanded(
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(widget.fundingAmount?.label ?? ''),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [Text('0'), Text(maxRevenue.toStringAsFixed(0))],
-          ),
-          Slider(
-            min: 0,
-            value: fundingAmount.toDouble(),
-            max: maxRevenue,
-            onChanged: (val) {
-              widget.handleUpdate(
-                  key: KnownKey.funding_amount, value: val.toInt());
-            },
-          ),
-        ],
-      )),
-      SizedBox(
-          width: 100,
-          height: 50,
-          child: TextFormField(
-            keyboardType: TextInputType.number,
-            key: Key(fundingAmount.toString()),
-            initialValue: fundingAmount.toString(),
-            onChanged: (val) {
-              // TODO: Fix bug..
-              var parsedVal = int.tryParse(val);
-              if (parsedVal != null && parsedVal <= maxRevenue) {
-                widget.handleUpdate(
-                    key: KnownKey.funding_amount, value: parsedVal);
-              }
-            },
-          )),
-    ]);
-  }
-}
-
-class UseOfFunds extends StatefulWidget {
-  final Metadata? useOfFunds;
-  final Map<KnownKey, int> knownKeyToValue;
-  final void Function({required KnownKey key, required int value}) handleUpdate;
-
-  const UseOfFunds({
-    super.key,
-    required this.useOfFunds,
-    required this.knownKeyToValue,
-    required this.handleUpdate,
-  });
-
-  @override
-  State<UseOfFunds> createState() => _UseOfFundsState();
-}
-
-class _UseOfFundsState extends State<UseOfFunds> {
-  String? useOfFund;
-  String? description;
-  String? amount;
-
-  List<Map<dynamic, dynamic>> usages = [];
-
-  void handleAdd() {
-    if (useOfFund != null && description != null && amount != null) {
-      setState(() {
-        usages.add({
-          'useOfFund': useOfFund,
-          'description': description,
-          'amount': amount,
-        });
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(widget.useOfFunds?.label ?? ''),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            DropdownMenu(
-                onSelected: (val) {
-                  setState(() {
-                    useOfFund = val;
-                  });
-                },
-                dropdownMenuEntries:
-                    widget.useOfFunds!.value.split('*').map((val) {
-                  return DropdownMenuEntry(value: val, label: val);
-                }).toList()),
-            SizedBox(
-              width: 100,
-              child: TextFormField(
-                onChanged: (val) {
-                  setState(() {
-                    description = val;
-                  });
-                },
-                decoration: InputDecoration(labelText: 'Description'),
-              ),
-            ),
-            SizedBox(
-                width: 100,
-                child: TextFormField(
-                  onChanged: (val) {
-                    setState(() {
-                      amount = val;
-                    });
-                  },
-                  decoration: InputDecoration(labelText: 'Amount'),
-                )),
-            FloatingActionButton(
-              onPressed: handleAdd,
-              child: Icon(Icons.add),
-            )
-          ],
-        ),
-        ...usages.asMap().entries.map((usageEntry) {
-          var idx = usageEntry.key;
-          var usage = usageEntry.value;
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ...usage.entries.map((entry) {
-                return Text(entry.value);
-              }),
-              FloatingActionButton(
-                onPressed: () {
-                  setState(() {
-                    usages.removeAt(idx);
-                  });
-                },
-                child: Icon(Icons.delete),
-              )
-            ],
-          );
-        })
-      ],
     );
   }
 }
