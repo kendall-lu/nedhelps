@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const Scaffold(
-        body: MyComponent(),
+        body: NedHelps(),
       ),
     );
   }
@@ -56,11 +56,11 @@ String toDollar(double? value) {
       : '\$0.00';
 }
 
-class MyComponent extends StatefulWidget {
-  const MyComponent({super.key});
+class NedHelps extends StatefulWidget {
+  const NedHelps({super.key});
 
   @override
-  State<MyComponent> createState() => _MyComponentState();
+  State<NedHelps> createState() => _NedHelpsState();
 }
 
 enum KnownKey {
@@ -77,7 +77,7 @@ enum RevenueShareFrequency {
   monthly,
 }
 
-class _MyComponentState extends State<MyComponent> {
+class _NedHelpsState extends State<NedHelps> {
   Metadata? revenue;
   Metadata? fundingAmount;
   Metadata? revenuePercentage;
