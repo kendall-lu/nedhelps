@@ -140,7 +140,7 @@ class _FinancingOptionsState extends State<FinancingOptions> {
       children: [
         Text(widget.desiredRepaymentDelay!.label),
         DropdownMenu(
-          initialSelection: temp?.toString(),
+          initialSelection: temp,
           onSelected: (value) {
             widget.handleUpdate(
               key: KnownKey.desired_repayment_delay,

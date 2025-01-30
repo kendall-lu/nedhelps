@@ -43,7 +43,9 @@ class _ResultsState extends State<Results> {
     final revenueShareFrequency =
         knownKeyToValue[KnownKey.revenue_share_frequency];
     final desiredRepaymentDelay =
-        knownKeyToValue[KnownKey.desired_repayment_delay] ?? 0;
+        knownKeyToValue[KnownKey.desired_repayment_delay] != null
+            ? filterNumbers(knownKeyToValue[KnownKey.desired_repayment_delay])
+            : 0;
     final desiredFeePercentage =
         knownKeyToValue[KnownKey.desired_fee_percentage] ?? 0;
 

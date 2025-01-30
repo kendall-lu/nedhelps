@@ -71,6 +71,9 @@ enum KnownKey {
   desired_repayment_delay,
   max_loan_amount,
   desired_fee_percentage,
+
+  revenue_percentage_min,
+  revenue_percentage_max,
 }
 
 enum RevenueShareFrequency {
@@ -86,6 +89,8 @@ class _NedHelpsState extends State<NedHelps> {
   Metadata? desiredRepaymentDelay;
   Metadata? useOfFunds;
   Metadata? desiredFeePercentage;
+  Metadata? revenuePercentageMin;
+  Metadata? revenuePercentageMax;
 
   Map<KnownKey, dynamic> knownKeyToValue = {};
 
@@ -104,15 +109,26 @@ class _NedHelpsState extends State<NedHelps> {
         var revenueAmount = knownKeyToValue[KnownKey.revenue_amount] ?? 0;
         var loanAmount = knownKeyToValue[KnownKey.loan_amount] ?? 0;
 
-        knownKeyToValue[KnownKey.revenue_percentage] =
+        var calculatedRevenuePercentage =
             ((0.156 / 6.2055 / revenueAmount) * (loanAmount * 10));
+
+        var upperBound =
+            knownKeyToValue[KnownKey.revenue_percentage_max] == null
+                ? double.infinity
+                : knownKeyToValue[KnownKey.revenue_percentage_max] / 100;
+        var lowerBound =
+            knownKeyToValue[KnownKey.revenue_percentage_min] == null
+                ? -double.infinity
+                : knownKeyToValue[KnownKey.revenue_percentage_min] / 100;
+
+        var boundedRevenuePercentage = calculatedRevenuePercentage >= upperBound
+            ? upperBound
+            : calculatedRevenuePercentage <= lowerBound
+                ? lowerBound
+                : calculatedRevenuePercentage;
+        knownKeyToValue[KnownKey.revenue_percentage] = boundedRevenuePercentage;
       } else if (key == KnownKey.desired_repayment_delay) {
-        try {
-          knownKeyToValue[KnownKey.desired_repayment_delay] =
-              filterNumbers(value);
-        } catch (err) {
-          print(err);
-        }
+        knownKeyToValue[KnownKey.desired_repayment_delay] = value;
       }
     });
   }
@@ -158,6 +174,18 @@ class _NedHelpsState extends State<NedHelps> {
                 var tempVal = double.parse(metadata.value);
                 handleUpdate(
                     key: KnownKey.desired_fee_percentage, value: tempVal);
+                break;
+              case 'revenue_percentage_min':
+                revenuePercentageMin = metadata;
+                handleUpdate(
+                    key: KnownKey.revenue_percentage_min,
+                    value: int.parse(metadata.value));
+                break;
+              case 'revenue_percentage_max':
+                handleUpdate(
+                    key: KnownKey.revenue_percentage_max,
+                    value: int.parse(metadata.value));
+                revenuePercentageMax = metadata;
                 break;
             }
           });
