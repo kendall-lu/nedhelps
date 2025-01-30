@@ -134,10 +134,13 @@ class _FinancingOptionsState extends State<FinancingOptions> {
   }
 
   Widget _buildDesiredRepaymentDelay() {
+    var temp = widget.knownKeyToValue[KnownKey.desired_repayment_delay];
+
     return Row(
       children: [
         Text(widget.desiredRepaymentDelay!.label),
         DropdownMenu(
+          initialSelection: temp?.toString(),
           onSelected: (value) {
             widget.handleUpdate(
               key: KnownKey.desired_repayment_delay,
@@ -146,7 +149,10 @@ class _FinancingOptionsState extends State<FinancingOptions> {
           },
           dropdownMenuEntries:
               widget.desiredRepaymentDelay!.value.split('*').map((val) {
-            return DropdownMenuEntry(value: val, label: val);
+            return DropdownMenuEntry(
+              value: val,
+              label: val,
+            );
           }).toList(),
         ),
       ],

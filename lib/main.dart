@@ -70,6 +70,7 @@ enum KnownKey {
   revenue_share_frequency,
   desired_repayment_delay,
   max_loan_amount,
+  desired_fee_percentage,
 }
 
 enum RevenueShareFrequency {
@@ -84,6 +85,7 @@ class _NedHelpsState extends State<NedHelps> {
   Metadata? revenueSharedFrequency;
   Metadata? desiredRepaymentDelay;
   Metadata? useOfFunds;
+  Metadata? desiredFeePercentage;
 
   Map<KnownKey, dynamic> knownKeyToValue = {};
 
@@ -105,8 +107,12 @@ class _NedHelpsState extends State<NedHelps> {
         knownKeyToValue[KnownKey.revenue_percentage] =
             ((0.156 / 6.2055 / revenueAmount) * (loanAmount * 10));
       } else if (key == KnownKey.desired_repayment_delay) {
-        knownKeyToValue[KnownKey.desired_repayment_delay] =
-            filterNumbers(value);
+        try {
+          knownKeyToValue[KnownKey.desired_repayment_delay] =
+              filterNumbers(value);
+        } catch (err) {
+          print(err);
+        }
       }
     });
   }
@@ -134,12 +140,24 @@ class _NedHelpsState extends State<NedHelps> {
                 break;
               case 'revenue_shared_frequency':
                 revenueSharedFrequency = metadata;
+                var initialVal = metadata.value.split('*').first;
+                handleUpdate(
+                    key: KnownKey.revenue_share_frequency, value: initialVal);
                 break;
               case 'desired_repayment_delay':
                 desiredRepaymentDelay = metadata;
+                var initialVal = metadata.value.split('*').first;
+                handleUpdate(
+                    key: KnownKey.desired_repayment_delay, value: initialVal);
                 break;
               case 'use_of_funds':
                 useOfFunds = metadata;
+                break;
+              case 'desired_fee_percentage':
+                desiredFeePercentage = metadata;
+                var tempVal = double.parse(metadata.value);
+                handleUpdate(
+                    key: KnownKey.desired_fee_percentage, value: tempVal);
                 break;
             }
           });

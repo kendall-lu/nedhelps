@@ -44,6 +44,8 @@ class _ResultsState extends State<Results> {
         knownKeyToValue[KnownKey.revenue_share_frequency];
     final desiredRepaymentDelay =
         knownKeyToValue[KnownKey.desired_repayment_delay] ?? 0;
+    final desiredFeePercentage =
+        knownKeyToValue[KnownKey.desired_fee_percentage] ?? 0;
 
     // Determine the frequency multiplier (12 for monthly, 52 for weekly)
     final revenueShareFrequencyMultiplier = revenueShareFrequency == 'monthly'
@@ -53,7 +55,7 @@ class _ResultsState extends State<Results> {
             : 0;
 
     // Calculate fees, total revenue share, and expected transfers
-    final calculatedTotalFees = revenueAmount * revenuePercentage;
+    final calculatedTotalFees = desiredFeePercentage * loanAmount;
     final calculatedTotalRevenueShare = loanAmount + calculatedTotalFees;
     final expectedTransfersDenom = revenueAmount * revenuePercentage;
 
@@ -94,7 +96,7 @@ class _ResultsState extends State<Results> {
             ResultSection(
               leading: 'Fees',
               trailing:
-                  '(${percentageFrom(revenuePercentage)}) ${toDollar(calculatedTotalFees)}',
+                  '(${percentageFrom(desiredFeePercentage)}) ${toDollar(calculatedTotalFees)}',
             ),
             const Divider(),
             ResultSection(
