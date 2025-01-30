@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart';
 import 'package:nedhelps/widgets/financing_options.dart';
 import 'package:nedhelps/widgets/results.dart';
@@ -30,6 +31,18 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+List<TextInputFormatter> decimalNumberInputFormatter = [
+  FilteringTextInputFormatter.allow(RegExp(r"[0-9.]")),
+  TextInputFormatter.withFunction((oldValue, newValue) {
+    final text = newValue.text;
+    return text.isEmpty
+        ? newValue
+        : double.tryParse(text) == null
+            ? oldValue
+            : newValue;
+  }),
+];
 
 Future<Response> fetchData() async {
   return await get(Uri.parse(

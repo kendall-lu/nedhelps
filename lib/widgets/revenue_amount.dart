@@ -82,7 +82,7 @@ class _RevenueAmountState extends State<RevenueAmount> {
         SizedBox(
           width: 100,
           child: TextFormField(
-            keyboardType: TextInputType.number,
+            inputFormatters: decimalNumberInputFormatter,
             controller: _controller,
             onChanged: _onTextChanged,
           ),

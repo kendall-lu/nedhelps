@@ -68,13 +68,13 @@ class _FinancingOptionsState extends State<FinancingOptions> {
               const Text('Financing options', style: TextStyle(fontSize: 30)),
               Text(widget.revenue?.label ?? ''),
               TextFormField(
-                keyboardType: TextInputType.number,
+                inputFormatters: decimalNumberInputFormatter,
                 controller: _controller,
                 onChanged: (val) {
-                  var parsedVal = int.tryParse(val);
+                  var parsedVal = double.tryParse(val) ?? 0;
                   widget.handleUpdate(
                     key: KnownKey.revenue_amount,
-                    value: parsedVal != null ? parsedVal.toDouble() : 0,
+                    value: parsedVal,
                   );
                 },
               ),
